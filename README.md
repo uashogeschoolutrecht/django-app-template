@@ -1,21 +1,20 @@
-# Gezonde Peutermonden
+# Django Template Repository
 
-![Django CI/CD](https://github.com/uashogeschoolutrecht/gzpmonden/actions/workflows/django.yml/badge.svg)
-
-This project consists of a web application for the Gezonde Peutermonden (Healthy Toddler Mouths) project at the Hogeschool Utrecht.
+This project consists of a web application for a template project at the Hogeschool Utrecht.
 
 ## Modules
 
-- [Source Code](./source/README.md): Python Django application code.
+- [Source Code](./source/README.md): Django application code.
 - [Infrastructure Configuration](./ansible/README.md): Ansible playbooks that configure the application environment for hosting the Django application.
+- [Application Configuration](./config/README.md): Django application configuration files.
 
 ## Scripts
 
-The `/scripts` directory holds operational scripts that can be used to deploy and manage a running instance of the application.
+The `./scripts` directory holds operational scripts that can be used to deploy and manage a running instance of the application.
 
 ### Manual Deployment
 
-You can deploy the application to an Ubuntu machine using the `./scripts/deploy.sh` script. This deploys the source code present under `source/` and config files under `config/`.
+You can deploy the application to an Ubuntu machine using the `./scripts/deploy.sh` script. This deploys the source artifact `source.tar.gz` and config files under `config/`.
 You need to set the following environment variables:
 
 ```shell
