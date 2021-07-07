@@ -1,0 +1,8 @@
+all:
+  vars:
+    env: staging
+  children:
+    hpc:
+      children:
+        django_app:
+          hosts:

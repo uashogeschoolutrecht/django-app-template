@@ -1,0 +1,73 @@
+---
+- name: Provision a django application
+  hosts: django_app
+  gather_facts: false
+  become: true
+  
+  vars_files:
+    - ./group_vars/django_app/vars
+    - ./group_vars/django_app/vault
+
+  roles:
+    - base
+    - database
+    - webserver
+  
+  tasks:
+    - name: Create log directory if it does not exist
+      file:
+        path: /home/{{ deploy_user }}/logs/
+        state: directory
+
+    - name: Create project directory if it does not exist
+      file:
+        path: /home/{{ deploy_user }}/{{ project_name }}/
+        state: directory
+    
+    - name: Copy source code
+      ansible.builtin.unarchive:
+        src: ../../source.tar.gz
+        dest: /home/{{ deploy_user }}/{{ project_name }}/
+        copy: yes
+      when: not ansible_check_mode
+      
+    - name: Install virtualenv
+      pip:
+        name: virtualenv
+        version: 15.1.0
+      tags: packages
+
+    - name: Create the virtualenv
+      command: virtualenv -p /usr/bin/python3 venv
+              creates=/home/{{ deploy_user }}/{{ project_name }}/venv/bin/activate
+
+    - name: Install dependencies
+      debugger: on_failed
+      pip:    
+        requirements: "/home/{{ deploy_user }}/{{ project_name }}/source/requirements.txt"
+        virtualenv: "/home/{{ deploy_user }}/{{ project_name }}/venv"
+            
+    - name: Make manage.py executable
+      file:
+        path: /home/{{ deploy_user }}/{{ project_name }}/source/manage.py
+        mode: 0777    
+      when: not ansible_check_mode
+
+    - name: Collect static files
+      django_manage:
+        command: collectstatic
+        app_path: /home/{{ deploy_user }}/{{ project_name }}/source/
+        virtualenv: /home/{{ deploy_user }}/{{ project_name }}/venv
+      when: not ansible_check_mode
+
+    - name: Makemigrations
+      django_manage:
+        command: makemigrations
+        app_path: /home/{{ deploy_user }}/{{ project_name }}/source/
+        virtualenv: /home/{{ deploy_user }}/{{ project_name }}/venv
+    
+    - name: Migrate
+      django_manage:
+        command: migrate
+        app_path: /home/{{ deploy_user }}/{{ project_name }}/source/
+        virtualenv: /home/{{ deploy_user }}/{{ project_name }}/venv

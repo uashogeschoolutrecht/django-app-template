@@ -1,0 +1,59 @@
+---
+- name: Update apt cache if needed
+  apt: 
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: set hostname
+  hostname:
+    name: "{{ project_name }}"
+
+- name: update hosts file
+  lineinfile:
+    dest: /etc/hosts
+    regexp: '^127\.0\.1\.1'
+    line: "127.0.1.1 {{ project_name }}"
+
+- name: Install base packages
+  apt:
+    state: present
+    name:
+      - build-essential
+      - fail2ban
+      - acl
+      - ntp
+      - htop
+      - git
+      - supervisor
+      - net-tools
+      - libpq-dev
+
+
+- name: install python packages
+  apt:
+    state: latest
+    name: 
+      - python3
+      - python3-pip
+      - python3-setuptools
+      - python3-venv
+      - python3-pkg-resources
+      - python3-dev
+      - snapd
+
+- name: Upgrade pip
+  pip: name=pip state=latest
+
+- name: install certbot
+  shell: snap install --classic certbot
+  become: yes
+
+- name: check if link exists
+  stat:
+    path: /usr/bin/certbot
+  register: sym
+
+- name: Prepare the Certbot command
+  shell: ln -s /snap/bin/certbot /usr/bin/certbot
+  when: sym.stat.islnk is not defined
+  become: yes

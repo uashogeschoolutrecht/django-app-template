@@ -1,0 +1,8 @@
+---
+- name: Create a PostgreSQL DB server
+  hosts: dbserver
+  become: true
+
+  roles:
+  - base
+  - database

@@ -1,0 +1,8 @@
+all:
+  vars:
+    env: production
+  children:
+    hpc:
+      children:
+        django_app:
+          hosts:

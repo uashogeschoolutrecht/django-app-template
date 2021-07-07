@@ -1,0 +1,295 @@
+name: Django CI/CD
+
+on:
+  push:
+    branches: [master, hotfix-*]
+  pull_request:
+    branches: [master]
+  release:
+    types: [published]
+
+jobs:
+  build:
+    name: Build and test webapp
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r source/requirements.txt
+
+      - name: Run Tests
+        run: |
+          python source/manage.py test
+
+      - name: Package files
+        run: tar -czf application.tar.gz source/ scripts/ ansible/ config/
+
+      - name: Upload application artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{ github.run_id }}
+          path: application.tar.gz
+
+  code_analysis:
+    name: Static code analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: reviewdog/action-setup@v1
+        with:
+          reviewdog_version: latest
+
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
+
+      - name: Check spelling
+        uses: reviewdog/action-misspell@v1
+        with:
+          github_token: ${{ secrets.github_token }}
+          locale: "US"
+        if: always()
+
+      - name: Ansible lint
+        uses: reviewdog/action-ansiblelint@v1
+        with:
+          github_token: ${{ secrets.github_token }}
+          ansiblelint_flags: '-x core ansible/playbooks/*'
+          workdir: ansible
+          fail_on_error: true
+        if: always()
+
+      - name: Flake8 style guide
+        uses: reviewdog/action-flake8@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          workdir: source
+          fail_on_error: true
+        if: always()
+
+      - name: Black formatting
+        uses: reviewdog/action-black@v2
+        with:
+          github_token: ${{ secrets.github_token }}
+          workdir: source
+          fail_on_error: true
+        if: always()
+
+      - name: MyPy type check
+        uses: tsuyoshicho/action-mypy@v3
+        with:
+          github_token: ${{ secrets.github_token }}
+          workdir: source
+        if: always()
+
+  dry_run_deploy_staging:
+    name: Dry run staging deployment
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install ansible
+        run: sudo apt-get install ansible
+
+      - name: Download application artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: ${{ github.run_id }}
+          path: .
+
+      - name: Unpack files
+        run: tar -xzf application.tar.gz
+
+      - name: Package source
+        run: tar -czf source.tar.gz source/
+
+      - name: Write secret files
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+          SSH_KEY: ${{ secrets.GZP_GH_KEY }}
+        run: echo "$ANSIBLE_VAULT_PASSWORD" > vault_pass.txt && echo "$SSH_KEY" > ssh_key && chmod 400 ssh_key
+
+      - name: Deploy source to staging (dry run)
+        if: ${{ github.event_name != 'release' && github.ref != 'refs/heads/master' }}
+        env:
+          DRY_RUN: true
+          SSH_KEY_FILE: ssh_key
+          VAULT_PW_FILE: vault_pass.txt
+          ENV: staging
+          DOMAIN: ${{ secrets.STG_DOMAIN }}
+        run: ./scripts/deploy_app.sh
+      
+      - name: Deploy config to staging (dry run)
+        if: ${{ github.event_name != 'release' && github.ref != 'refs/heads/master' }}
+        env:
+          DRY_RUN: true
+          SSH_KEY_FILE: ssh_key
+          VAULT_PW_FILE: vault_pass.txt
+          ENV: staging
+        run: ./scripts/deploy_config.sh
+
+  dry_run_deploy_production:
+    name: Dry run production deployment
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install ansible
+        run: sudo apt-get install ansible
+
+      - name: Download application artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: ${{ github.run_id }}
+          path: .
+
+      - name: Unpack files
+        run: tar -xzf application.tar.gz
+
+      - name: Package source
+        run: tar -czf source.tar.gz source/
+
+      - name: Write secret files
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+          SSH_KEY: ${{ secrets.GZP_GH_KEY }}
+        run: echo "$ANSIBLE_VAULT_PASSWORD" > vault_pass.txt && echo "$SSH_KEY" > ssh_key && chmod 400 ssh_key
+
+      - name: Deploy source to prod (dry run)
+        if: ${{ github.event_name != 'release'}}
+        env:
+          DRY_RUN: true
+          SSH_KEY_FILE: ssh_key
+          VAULT_PW_FILE: vault_pass.txt
+          ENV: production
+          DOMAIN: ${{ secrets.PRD_DOMAIN }}
+        run: ./scripts/deploy_app.sh
+      
+      - name: Deploy config to prod (dry run)
+        if: ${{ github.event_name != 'release' && github.ref != 'refs/heads/master' }}
+        env:
+          DRY_RUN: true
+          SSH_KEY_FILE: ssh_key
+          VAULT_PW_FILE: vault_pass.txt
+          ENV: production
+        run: ./scripts/deploy_config.sh
+
+  deploy_staging:
+    name: Deploy to staging
+    needs: [build, code_analysis, dry_run_deploy_staging]
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'release' || github.ref == 'refs/heads/master' }}
+
+    steps:
+      - name: Install ansible
+        run: sudo apt-get install ansible
+
+      - name: Download application artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: ${{ github.run_id }}
+          path: .
+
+      - name: Unpack files
+        run: tar -xzf application.tar.gz
+
+      - name: Package source
+        run: tar -czf source.tar.gz source/
+
+      - name: Write secret files
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+          SSH_KEY: ${{ secrets.GZP_GH_KEY }}
+        run: echo "$ANSIBLE_VAULT_PASSWORD" > vault_pass.txt && echo "$SSH_KEY" > ssh_key && chmod 400 ssh_key
+
+      - name: Deploy source
+        if: ${{ github.event_name == 'release' || github.ref == 'refs/heads/master' }}
+        env:
+          SSH_KEY_FILE: ssh_key
+          VAULT_PW_FILE: vault_pass.txt
+          ENV: staging
+          DOMAIN: ${{ secrets.STG_DOMAIN }}
+        run: ./scripts/deploy_app.sh
+
+      - name: Deploy config
+        if: ${{ github.event_name == 'release' || github.ref == 'refs/heads/master' }}
+        env:
+          SSH_KEY_FILE: ssh_key
+          VAULT_PW_FILE: vault_pass.txt
+          ENV: staging
+        run: ./scripts/deploy_config.sh
+
+  deploy_production:
+    name: Deploy to production
+    needs: [dry_run_deploy_production, smoke_test_staging]
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'release' || github.ref == 'refs/heads/master' }}
+
+    steps:
+      - name: Install ansible
+        run: sudo apt-get install ansible
+
+      - name: Download application artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: ${{ github.run_id }}
+          path: .
+
+      - name: Unpack files
+        run: tar -xzf application.tar.gz
+
+      - name: Package source
+        run: tar -czf source.tar.gz source/
+
+      - name: Write secret files
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+          SSH_KEY: ${{ secrets.GZP_GH_KEY }}
+        run: echo "$ANSIBLE_VAULT_PASSWORD" > vault_pass.txt && echo "$SSH_KEY" > ssh_key && chmod 400 ssh_key
+
+      - name: Deploy source
+        if: ${{ github.event_name == 'release'}}
+        env:
+          SSH_KEY_FILE: ssh_key
+          VAULT_PW_FILE: vault_pass.txt
+          ENV: production
+          DOMAIN: ${{ secrets.PRD_DOMAIN }}
+        run: ./scripts/deploy_app.sh
+
+      - name: Deploy config
+        if: ${{ github.event_name == 'release' || github.ref == 'refs/heads/master' }}
+        env:
+          SSH_KEY_FILE: ssh_key
+          VAULT_PW_FILE: vault_pass.txt
+          ENV: production
+        run: ./scripts/deploy_config.sh
+
+  smoke_test_staging:
+    name: Smoke test webapp staging
+    needs: deploy_staging
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'release' || github.ref == 'refs/heads/master' }}
+
+    steps:
+      - name: Liveness check staging
+        run: HTTP_STATUS_OK=200 STATUS=$(curl -L --head --silent --write-out '%{http_code}' --output /dev/null ${{ secrets.STG_DOMAIN }}) test $HTTP_STATUS_OK = $STATUS
+     
+  smoke_test_production:
+    name: Smoke test webapp production
+    needs: deploy_production
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'release' || github.ref == 'refs/heads/master' }}
+
+    steps:     
+      - name: Liveness check production
+        run: HTTP_STATUS_OK=200 STATUS=$(curl -L --head --silent --write-out '%{http_code}' --output /dev/null ${{ secrets.PRD_DOMAIN }}) test $HTTP_STATUS_OK = $STATUS

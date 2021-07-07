@@ -1,0 +1,30 @@
+---
+
+dependencies: []
+
+galaxy_info:
+  author: 'stefangweichinger'
+  role_name: 'ansible_rclone'
+  description: 'Install rclone'
+  company: 'oops'
+  license: 'GNU General Public License v3'
+  min_ansible_version: '2.0'
+  platforms:
+    - name: EL
+      versions:
+        - 8
+    - name: Debian
+      versions:
+        - buster
+        - stretch
+    - name: Fedora
+      versions:
+        - 33
+        - 32
+    - name: Ubuntu
+      versions:
+        - focal
+        - bionic
+  galaxy_tags:
+    - networking
+    - system

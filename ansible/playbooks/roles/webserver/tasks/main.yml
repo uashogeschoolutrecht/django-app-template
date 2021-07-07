@@ -1,0 +1,61 @@
+- name: install apache2
+  apt:
+    name: apache2
+    update_cache: yes
+    state: latest
+
+- name: copy config file
+  template:
+    src: ./templates/apache.conf.j2
+    dest: /etc/apache2/sites-available/{{ project_name }}.conf
+
+- name: install libapache2-mod-wsgi-py3
+  apt:
+    name: libapache2-mod-wsgi-py3
+    state: latest
+    
+- name: enabled mod_rewrite
+  apache2_module: name=rewrite state=present
+  notify:
+    - restart apache2
+  when: not ansible_check_mode
+
+- name: allow incoming HTTP connections
+  ufw:
+    rule: allow
+    port: http
+    proto: tcp
+
+- name: allow incoming HTTPS connections
+  ufw:
+    rule: allow
+    port: https
+
+- name: Enable new site
+  shell: /usr/sbin/a2ensite {{ project_name }}
+  notify: Reload Apache
+
+- name: Disable default Apache site
+  shell: /usr/sbin/a2dissite 000-default.conf
+  notify: Reload Apache
+  
+- name: Execute certbot
+  shell: "certbot --apache --noninteractive --agree-tos --email {{ lets_encrypt_email }} -d {{ domain_name }}"
+
+- name: Uncomment WSGIScriptAlias settings in Apache2 configuration
+  replace:
+    path: /etc/apache2/sites-available/{{ project_name }}-le-ssl.conf
+    regexp: '#WSGIScriptAlias'
+    replace: 'WSGIScriptAlias'
+
+- name: Uncomment WSGIDaemonProcess settings in Apache2 configuration
+  replace:
+    path: /etc/apache2/sites-available/{{ project_name }}-le-ssl.conf
+    regexp: '#WSGIDaemonProcess'
+    replace: 'WSGIDaemonProcess'
+
+- name: Uncomment WSGIProcessGroup settings in Apache2 configuration
+  replace:
+    path: /etc/apache2/sites-available/{{ project_name }}-le-ssl.conf
+    regexp: '#WSGIProcessGroup'
+    replace: 'WSGIProcessGroup'

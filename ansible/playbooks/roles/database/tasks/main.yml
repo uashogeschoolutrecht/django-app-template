@@ -1,0 +1,39 @@
+- name: Make sure psycopg2 is installed
+  pip:
+    name: psycopg2
+    state: present
+
+- name: install postgresql
+  become: yes
+  apt: 
+    name: postgresql
+    state: present
+
+- name: add database
+  become: yes
+  become_user: postgres
+  postgresql_db:
+    name: "{{ project_name }}"
+    state: present
+  when: not ansible_check_mode
+
+- name: add user
+  become: yes
+  become_user: postgres
+  postgresql_user:
+    db: "{{ project_name }}"
+    name: "{{ db_user }}" 
+    password: "{{ db_password }}"
+    encrypted: "yes"
+    priv: "ALL/ALL"
+    state: present
+  when: not ansible_check_mode
+
+- name: create backup cronjob every night
+  cron:
+    name: "backup database"
+    user: postgres
+    minute: "0"
+    hour: "0"
+    job: "pg_dump  -U postgres {{ project_name }} > /tmp/backups/database/{{ project_name }}.bak"
+  when: not ansible_check_mode
