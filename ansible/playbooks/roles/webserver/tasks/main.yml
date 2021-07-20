@@ -47,15 +47,18 @@
     path: /etc/apache2/sites-available/{{ project_name }}-le-ssl.conf
     regexp: '#WSGIScriptAlias'
     replace: 'WSGIScriptAlias'
+  when: not ansible_check_mode
 
 - name: Uncomment WSGIDaemonProcess settings in Apache2 configuration
   replace:
     path: /etc/apache2/sites-available/{{ project_name }}-le-ssl.conf
     regexp: '#WSGIDaemonProcess'
     replace: 'WSGIDaemonProcess'
+  when: not ansible_check_mode
 
 - name: Uncomment WSGIProcessGroup settings in Apache2 configuration
   replace:
     path: /etc/apache2/sites-available/{{ project_name }}-le-ssl.conf
     regexp: '#WSGIProcessGroup'
     replace: 'WSGIProcessGroup'
+  when: not ansible_check_mode
