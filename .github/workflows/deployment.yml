@@ -38,7 +38,7 @@ jobs:
 
   deploy_staging_source:
     name: Deploy source to staging
-    needs: [build]
+    needs: [build, deploy_staging_config]
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'release' || github.ref == 'refs/heads/master' }}
 
@@ -106,7 +106,7 @@ jobs:
 
   deploy_production_source:
     name: Deploy source to production
-    needs: [smoke_test_staging]
+    needs: [smoke_test_staging, deploy_production_config]
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'release'}}
 
