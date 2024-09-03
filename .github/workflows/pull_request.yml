@@ -99,7 +99,7 @@ jobs:
         run: sudo apt-get install ansible
 
       - name: Download application artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4.1.7
         with:
           name: ${{ github.run_id }}
           path: .
@@ -135,7 +135,7 @@ jobs:
         run: sudo apt-get install ansible
 
       - name: Download application artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4.1.7
         with:
           name: ${{ github.run_id }}
           path: .
@@ -167,7 +167,7 @@ jobs:
         run: sudo apt-get install ansible
 
       - name: Download application artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4.1.7
         with:
           name: ${{ github.run_id }}
           path: .
@@ -203,7 +203,7 @@ jobs:
         run: sudo apt-get install ansible
 
       - name: Download application artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4.1.7
         with:
           name: ${{ github.run_id }}
           path: .
